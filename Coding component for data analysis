@@ -20,6 +20,7 @@ from nltk.sentiment import SentimentIntensityAnalyzer
 nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('wordnet')
+nltk.download('vader_lexicon')
 
 #loading the data
 amazon_reviews_dataset = pd.read_csv('reviews.csv', quotechar='"')
@@ -136,9 +137,9 @@ random.seed(42)
 
 # Split dataset into training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(
-    amazon_reviews_dataset['processed_text'], 
-    amazon_reviews_dataset['Score'].apply(map_label), 
-    test_size=0.2, 
+    amazon_reviews_dataset['processed_text'],
+    amazon_reviews_dataset['true_category'],
+    test_size=0.2,
     random_state=42
 )
 
@@ -148,11 +149,8 @@ X_train_vect = vectorizer.fit_transform(X_train)
 X_test_vect = vectorizer.transform(X_test)
 
 # Define parameter grids for GridSearchCV
-nb_params = {'alpha': [0.01, 0.1, 1.0, 10.0, 100.0]}  # Smoothing parameters for Naive Bayes
-rf_params = {
-    'n_estimators': [50, 100, 200],  # Number of trees in the forest
-    'max_depth': [10, 50, 100, None]  # Maximum depth of the trees
-}
+nb_params = {'alpha': [0.01, 0.1, 1.0, 10.0, 100.0]}
+rf_params = {'n_estimators': [50, 100, 200], 'max_depth': [10, 50, 100, None]}
 
 # Initialize GridSearchCV for Naive Bayes and Random Forest with 'f1_weighted' scoring
 nb_grid = GridSearchCV(MultinomialNB(), nb_params, cv=5, scoring='f1_weighted')
@@ -166,28 +164,20 @@ rf_grid.fit(X_train_vect, y_train)
 nb_predictions = nb_grid.best_estimator_.predict(X_test_vect)
 rf_predictions = rf_grid.best_estimator_.predict(X_test_vect)
 
-# Generate and print classification reports
-print("Classification Report for Naive Bayes:")
-print(classification_report(y_test, nb_predictions, target_names=['negative', 'neutral', 'positive']))
-
-print("\nClassification Report for Random Forest:")
-print(classification_report(y_test, rf_predictions, target_names=['negative', 'neutral', 'positive']))
-
-# Confusion matrices
-nb_conf_matrix = confusion_matrix(y_test, nb_predictions)
-rf_conf_matrix = confusion_matrix(y_test, rf_predictions)
-
-# Function to plot confusion matrix
-def plot_confusion_matrix(cm, title):
-    plt.figure(figsize=(8, 6))
+# Evaluation metrics
+def calculate_accuracy_and_report(y_true, y_pred, model_name):
+    print(f"Classification Report for {model_name}:")
+    print(classification_report(y_true, y_pred, target_names=['negative', 'neutral', 'positive']))
+    print(f"Confusion Matrix for {model_name}:")
+    cm = confusion_matrix(y_true, y_pred)
     sns.heatmap(cm, annot=True, fmt="d", cmap='Blues', cbar=False)
-    plt.title(title)
+    plt.title(f'{model_name} Confusion Matrix')
     plt.ylabel('Actual')
     plt.xlabel('Predicted')
     plt.show()
 
-# Plotting confusion matrices
-plot_confusion_matrix(nb_conf_matrix, title='Naive Bayes Confusion Matrix')
-plot_confusion_matrix(rf_conf_matrix, title='Random Forest Confusion Matrix')
+# Generate reports for both models
+calculate_accuracy_and_report(y_test, nb_predictions, 'Naive Bayes')
+calculate_accuracy_and_report(y_test, rf_predictions, 'Random Forest')
 
 
